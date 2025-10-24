@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export default {
-  name: "tiktok",
+  name: "tt",
   category: "Downloader",
   description: "Download video atau audio TikTok tanpa watermark 🎵",
   owner: false,
