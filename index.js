@@ -66,9 +66,9 @@ bot.on("message", async (msg) => {
   if (!msg.text || !msg.text.startsWith("/")) return;
   const text = msg.text;
 
-  if (text.toLowerCase() === "/menu") {
+  if (text.toLowerCase() === "/menu" || text.toLowerCase() === "/start") {
     const categories = {};
-    
+        
     Object.values(commands).forEach(c => {
      
       if (c && typeof c === 'object' && c.name) {
