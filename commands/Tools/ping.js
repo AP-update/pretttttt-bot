@@ -5,6 +5,6 @@ export default {
   owner: false,
   admin: false,
   execute: async ({ bot, msg }) => {
-    await bot.sendMessage(msg.chat.id, "🏓 Pong!");
+    await bot.sendMessage(msg.chat.id, "🏓 Pong! bot online by AP");
   },
 };
