@@ -24,7 +24,7 @@ console.log(chalk.green(`Owner ID: ${OWNER_ID}`));
 console.log(chalk.magenta(`Commands loaded: ${Object.keys(commands).length}`));
 console.log(chalk.cyan(`Users: ${users.length}`));
 console.log(chalk.yellow(`Uptime: ${process.uptime().toFixed(0)}s`));
-console.log(chalk.bgGreen.white("✅ Bot polling..."));
+console.log(chalk.bgGreen.white("✅ Bot is now running..."));
 
 const commandsDir = path.join(__dirname, "commands"); 
 
