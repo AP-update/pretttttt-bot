@@ -1,0 +1,22 @@
+{
+  "name": "prettttttt-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot Node.js type ESM",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "latest",
+    "chalk": "^5.3.0",
+    "cheerio": "^1.1.2",
+    "node-fetch": "latest",
+    "node-telegram-bot-api": "^0.61.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "AP",
+  "license": "MIT"
+}
