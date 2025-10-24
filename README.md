@@ -10,7 +10,7 @@
 <img src="https://img-url.com/license-mit" />
 </p>
 🧩 Struktur Folder
-Prettttttt-Bot/
+```Prettttttt-Bot/
 ├── commands/
 │   ├── admin/
 │   │   └── broadcast.js
@@ -31,7 +31,7 @@ Prettttttt-Bot/
 ├── config.js
 ├── index.js
 ├── package.json
-└── users.json
+└── users.json```
 
 ⚙️ Tentang Proyek
 Prettttttt-Bot adalah base bot Telegram modular berbasis Node.js (ESM).
