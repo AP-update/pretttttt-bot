@@ -13,21 +13,29 @@ export default {
           "❗ Masukkan teks setelah perintah.\nContoh: `/feloai halloo`"
         );
 
-      const res = await fetch(`https://api.nekolabs.my.id/ai/feloai?text=${encodeURIComponent(text)}`);
+      const res = await fetch(
+        `https://api-ape.web.id/ai/felo?text=${encodeURIComponent(text)}`
+      );
       const data = await res.json();
 
-      if (data.success && data.result) {
-        const reply = `✨ *FeloAI berkata:*\n\n${data.result.text}`;
+      if (data.status && data.result?.answer) {
+        const reply = `✨ *FeloAI berkata:*\n\n${data.result.answer}`;
         await bot.sendMessage(msg.chat.id, reply, {
           parse_mode: "Markdown",
           disable_web_page_preview: true,
         });
       } else {
-        await bot.sendMessage(msg.chat.id, "⚠️ Tidak ada respons dari *FeloAI*.");
+        await bot.sendMessage(
+          msg.chat.id,
+          "⚠️ Tidak ada respons dari *FeloAI*."
+        );
       }
     } catch (err) {
       console.error(err);
-      await bot.sendMessage(msg.chat.id, "❌ Terjadi kesalahan saat memproses permintaan.");
+      await bot.sendMessage(
+        msg.chat.id,
+        "❌ Terjadi kesalahan saat memproses permintaan."
+      );
     }
   },
 };
