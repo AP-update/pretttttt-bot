@@ -1,6 +1,7 @@
+
 import axios from "axios";
 import FormData from "form-data";
-import { BOT_TOKEN } from "../config.js"; // sesuaikan path bila perlu
+import { BOT_TOKEN } from "../config.js"; // sesuaikan path jika perlu
 
 export default {
   name: "hd",
@@ -10,51 +11,67 @@ export default {
   admin: false,
 
   execute: async ({ bot, msg }) => {
+    const chatId = msg.chat.id;
+
+    // Cek apakah pesan berisi foto atau membalas foto
+    const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
+
+    if (!photo) {
+      return bot.sendMessage(
+        chatId,
+        "📌 Kirim atau *balas gambar* dengan perintah /hd",
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    // Ambil file_id resolusi tertinggi
+    const fileId = photo[photo.length - 1].file_id;
+    const loadingMsg = await bot.sendMessage(chatId, "⏳ Sedang memproses gambar, mohon tunggu...");
+
     try {
-      // Validasi: harus reply foto
-      if (!msg.reply_to_message || !msg.reply_to_message.photo) {
-        return bot.sendMessage(
-          msg.chat.id,
-          "📌 Balas *foto* dengan perintah:\n/hd",
-          { parse_mode: "Markdown" }
-        );
-      }
-
-      await bot.sendMessage(msg.chat.id, "⏳ Memproses gambar...");
-
-      // Ambil foto resolusi terbesar
-      const photo = msg.reply_to_message.photo.pop();
-      const file = await bot.getFile(photo.file_id);
+      // 1. Dapatkan file path dari Telegram
+      const file = await bot.getFile(fileId);
       const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
 
-      // Download foto
-      const image = await axios.get(fileUrl, { responseType: "arraybuffer" });
+      // 2. Download gambar
+      const imageResponse = await axios.get(fileUrl, { responseType: "arraybuffer" });
+      const buffer = Buffer.from(imageResponse.data);
 
-      // Upload ke Pixelcut
+      // 3. Siapkan FormData untuk Pixelcut
       const form = new FormData();
-      form.append("image", image.data, { filename: "image.jpg" });
+      form.append("image", buffer, {
+        filename: `upscale_${Date.now()}.jpg`,
+        contentType: "image/jpeg",
+      });
       form.append("scale", "2");
 
+      const headers = {
+        ...form.getHeaders(),
+        accept: "application/json",
+        "x-client-version": "web",
+        "x-locale": "en",
+      };
+
+      // 4. Kirim ke Pixelcut
       const res = await axios.post(
         "https://api2.pixelcut.app/image/upscale/v1",
         form,
-        { headers: form.getHeaders() }
+        { headers }
       );
 
-      if (!res.data?.result_url) throw new Error("Upscale gagal.");
+      if (!res.data?.result_url) throw new Error("Gagal mendapatkan URL hasil.");
 
-      // Ambil hasil upscale
-      const result = await axios.get(res.data.result_url, { responseType: "arraybuffer" });
-
-      // Kirim ke user
-      await bot.sendPhoto(msg.chat.id, result.data, {
-        caption: "✨ *Berhasil!* Resolusi gambar ditingkatkan hingga 2x.",
-        parse_mode: "Markdown"
+      // 5. Kirim hasil ke user
+      await bot.sendPhoto(chatId, res.data.result_url, {
+        caption: "✨ *Upscale Berhasil!*\n\nKualitas telah ditingkatkan 2x lebih tajam.",
+        parse_mode: "Markdown",
       });
 
-    } catch (err) {
-      console.error("[HD ERROR]", err);
-      await bot.sendMessage(msg.chat.id, "❌ Gagal memproses gambar.");
+    } catch (e) {
+      console.error("[HD ERROR]", e);
+      await bot.sendMessage(chatId, `❌ Gagal memproses gambar:\n${e.message}`);
+    } finally {
+      bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
     }
-  }
+  },
 };
