@@ -1,68 +1,106 @@
+
 import axios from "axios";
 
-const rawThemes = [
-  "3024 night","A11y dark","Blackboard","Base16 dark","Base16 light",
-  "Cobalt","Dracula","Dracula pro","Duotone dark","Hopscotch","Lucario",
-  "Material","Monokai","Night owl","Nord","Oceanic next","One dark",
-  "One light","Panda syntax","Paraiso dark","Seti","Shades of purple",
-  "Solarized dark","Solarized light","Synthwave '84","Twilight",
-  "Verminal","Vscode","Yeti","Zenburn"
-];
+async function generateCarbonImage(code, theme, language, preset) {
+  const CONFIG = {
+    API_URL: "https://carbonara.solopov.dev/api/cook",
+    UA: "Mozilla/5.0",
+    TIMEOUT: 30000
+  };
 
-const normalize = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const themeMap = Object.fromEntries(rawThemes.map(t => [normalize(t), t]));
+  let size = {
+    widthAdjustment: true,
+    paddingHorizontal: "48px",
+    paddingVertical: "48px"
+  };
 
-function detectLanguage(code) {
-  if (/^\s*</.test(code)) return "html";
-  if (/console\.log|require\(|import /.test(code)) return "javascript";
-  if (/def |print\(/.test(code)) return "python";
-  if (/System\.out\.println|public static void/.test(code)) return "java";
-  return "auto";
-}
+  if (preset === "mobile") {
+    size = { widthAdjustment: false, paddingHorizontal: "24px", paddingVertical: "48px" };
+  }
 
-async function generate(code, theme, language, preset) {
-  let size = { widthAdjustment: true, paddingHorizontal: "48px", paddingVertical: "48px" };
-  if (preset === "mobile") size = { widthAdjustment: false, paddingHorizontal: "24px", paddingVertical: "48px" };
-  if (preset === "story") size = { widthAdjustment: false, paddingHorizontal: "32px", paddingVertical: "96px" };
+  if (preset === "story") {
+    size = { widthAdjustment: false, paddingHorizontal: "32px", paddingVertical: "96px" };
+  }
 
-  const res = await axios.post("https://carbonara.solopov.dev/api/cook", {
-    code, language, theme,
+  const payload = {
+    code,
+    language,
+    theme,
     backgroundColor: "#1F2937",
     dropShadow: true,
     windowControls: true,
     lineNumbers: true,
     ...size
-  }, { responseType: "arraybuffer", timeout: 30000 });
+  };
+
+  const res = await axios.post(CONFIG.API_URL, payload, {
+    headers: { "User-Agent": CONFIG.UA },
+    responseType: "arraybuffer",
+    timeout: CONFIG.TIMEOUT
+  });
 
   return Buffer.from(res.data);
 }
 
+function detectLanguage(code) {
+  if (/^\s*</.test(code)) return "html";
+  if (/console\.log|require\(|import /.test(code)) return "javascript";
+  if (/def |print\(|import /.test(code)) return "python";
+  if (/public static void|System\.out\.println/.test(code)) return "java";
+  if (/#include <|std::/.test(code)) return "cpp";
+  return "auto";
+}
+
 export default {
   name: "carbon",
+  category: "Tools",
+  description: "Ubah kode jadi gambar estetik 🎨",
   execute: async ({ bot, msg }) => {
-    const help = `🎨 *CARBON*\n\nFormat:\n/carbon tema,preset|kode\n\nContoh:\n/carbon nightowl,story|console.log("Hello")`;
 
-    const input = msg.text.split(" ").slice(1).join(" ");
-    if (!input) return bot.sendMessage(msg.chat.id, help, { parse_mode: "Markdown" });
+    const themes = ["blackboard","cobalt","dracula","hopscotch","lucario","material","monokai","nord","seti","twilight","verminal","vscode","yeti","zenburn"];
+    const presets = ["desktop","mobile","story"];
 
-    let meta = "dracula,desktop", code = input;
-    if (input.includes("|")) [meta, code] = input.split("|");
+    const help = `🎨 *CARBON*\n\nFormat:\n\`/carbon tema,preset|kode\`\n\nTema:\n${themes.join(", ")}\n\nPreset:\n${presets.join(", ")}\n\nContoh:\n\`/carbon monokai,story|console.log("Hi")\``;
 
-    let [inputTheme, preset] = meta.split(",");
-    const theme = themeMap[normalize(inputTheme || "")] || "Dracula";
-    preset = ["desktop","mobile","story"].includes(preset) ? preset : "desktop";
+    try {
+      const input = msg.text.split(" ").slice(1).join(" ");
+      if (!input) return bot.sendMessage(msg.chat.id, help, { parse_mode: "Markdown" });
 
-    let language = detectLanguage(code);
-    try { code = JSON.stringify(JSON.parse(code), null, 2); language = "json"; } catch {}
+      let meta = "dracula,desktop";
+      let code = input;
 
-    const loading = await bot.sendMessage(msg.chat.id, "⏳ Generating...", { parse_mode: "Markdown" });
-    const image = await generate(code, theme, language, preset);
+      if (input.includes("|")) [meta, code] = input.split("|");
 
-    await bot.sendPhoto(msg.chat.id, image, {
-      caption: `🎨 ${theme} | 🧩 ${language} | 📐 ${preset}`,
-      parse_mode: "Markdown"
-    });
+      let [theme, preset] = meta.toLowerCase().split(",");
+      theme = themes.includes(theme) ? theme : "dracula";
+      preset = presets.includes(preset) ? preset : "desktop";
 
-    await bot.deleteMessage(msg.chat.id, loading.message_id);
+      let language = detectLanguage(code);
+
+      try {
+        const json = JSON.parse(code);
+        code = JSON.stringify(json, null, 2);
+        language = "json";
+      } catch {}
+
+      const loading = await bot.sendMessage(
+        msg.chat.id,
+        `⏳ Generating • ${theme} • ${language} • ${preset}`,
+        { parse_mode: "Markdown" }
+      );
+
+      const image = await generateCarbonImage(code, theme, language, preset);
+
+      await bot.sendPhoto(msg.chat.id, image, {
+        caption: `✅ *Success*\n🎨 ${theme} | 🧩 ${language} | 📐 ${preset}`,
+        parse_mode: "Markdown"
+      });
+
+      await bot.deleteMessage(msg.chat.id, loading.message_id);
+
+    } catch (e) {
+      console.error(e);
+      bot.sendMessage(msg.chat.id, "❌ Error membuat gambar.");
+    }
   }
 };
