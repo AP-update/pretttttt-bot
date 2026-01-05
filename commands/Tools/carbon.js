@@ -1,94 +1,105 @@
 import axios from "axios";
 
-async function generateCarbonImage(code, selectedTheme) {
+async function generateCarbonImage(code, theme, language, preset) {
   const CONFIG = {
-    API_URL: 'https://carbonara.solopov.dev/api/cook',
-    UA: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    API_URL: "https://carbonara.solopov.dev/api/cook",
+    UA: "Mozilla/5.0",
     TIMEOUT: 30000
   };
 
+  let size = {
+    widthAdjustment: true,
+    paddingHorizontal: "48px",
+    paddingVertical: "48px"
+  };
+
+  if (preset === "mobile") {
+    size = { widthAdjustment: false, paddingHorizontal: "24px", paddingVertical: "48px" };
+  }
+
+  if (preset === "story") {
+    size = { widthAdjustment: false, paddingHorizontal: "32px", paddingVertical: "96px" };
+  }
+
   const payload = {
-    code: code,
-    language: 'javascript',
-    theme: selectedTheme.toLowerCase(),
+    code,
+    language,
+    theme,
     backgroundColor: "#1F2937",
     dropShadow: true,
     windowControls: true,
-    widthAdjustment: true,
     lineNumbers: true,
-    paddingVertical: "48px",
-    paddingHorizontal: "48px"
+    ...size
   };
 
-  const response = await axios.post(CONFIG.API_URL, payload, {
-    headers: { 'Content-Type': 'application/json', 'User-Agent': CONFIG.UA },
-    responseType: 'arraybuffer',
+  const res = await axios.post(CONFIG.API_URL, payload, {
+    headers: { "User-Agent": CONFIG.UA },
+    responseType: "arraybuffer",
     timeout: CONFIG.TIMEOUT
   });
 
-  return Buffer.from(response.data);
+  return Buffer.from(res.data);
+}
+
+function detectLanguage(code) {
+  if (/^\s*</.test(code)) return "html";
+  if (/console\.log|require\(|import /.test(code)) return "javascript";
+  if (/def |print\(|import /.test(code)) return "python";
+  if (/public static void|System\.out\.println/.test(code)) return "java";
+  if (/#include <|std::/.test(code)) return "cpp";
+  return "auto";
 }
 
 export default {
   name: "carbon",
   category: "Tools",
-  description: "Ubah kode jadi gambar dengan tema custom 🎨",
+  description: "Ubah kode jadi gambar estetik 🎨",
   execute: async ({ bot, msg }) => {
-    const themes = [
-      "3024 night", "a11y dark", "blackboard", "base16 dark", "base16 light",
-      "cobalt", "dracula", "dracula pro", "duotone dark", "hopscotch",
-      "lucario", "material", "monokai", "night owl", "nord", "oceanic next",
-      "one dark", "one light", "panda syntax", "paraiso dark", "seti",
-      "shades of purple", "solarized dark", "solarized light", "synthwave '84",
-      "twilight", "verminal", "vscode", "yeti", "zenburn"
-    ];
+
+    const themes = ["blackboard","cobalt","dracula","hopscotch","lucario","material","monokai","nord","seti","twilight","verminal","vscode","yeti","zenburn"];
+    const presets = ["desktop","mobile","story"];
+
+    const help = `🎨 *CARBON*\n\nFormat:\n\`/carbon tema,preset|kode\`\n\nTema:\n${themes.join(", ")}\n\nPreset:\n${presets.join(", ")}\n\nContoh:\n\`/carbon monokai,story|console.log("Hi")\``;
 
     try {
-      // PERBAIKAN: Mengambil teks murni setelah /carbon tanpa mempedulikan spasi awal
-      const inputRaw = msg.text.includes(" ") ? msg.text.split(/\s(.+)/)[1] : "";
+      const input = msg.text.split(" ").slice(1).join(" ");
+      if (!input) return bot.sendMessage(msg.chat.id, help, { parse_mode: "Markdown" });
 
-      if (!inputRaw) {
-        const listTema = themes.map(t => `◦ ${t.replace(/\b\w/g, l => l.toUpperCase())}`).join("\n");
-        return await bot.sendMessage(msg.chat.id, `🎨 *CARBONARA HELP*\n\nFormat: \`/carbon tema|kode\`\n\n*Daftar Tema:*\n${listTema}`, { parse_mode: "Markdown" });
-      }
+      let meta = "dracula,desktop";
+      let code = input;
 
-      let theme = "dracula"; // Default
-      let code = inputRaw;
+      if (input.includes("|")) [meta, code] = input.split("|");
 
-      // Logika: Jika ada simbol |, maka kita bedah temanya
-      if (inputRaw.includes("|")) {
-        // split hanya pada pipe pertama
-        const firstPipeIndex = inputRaw.indexOf("|");
-        const stringTheme = inputRaw.substring(0, firstPipeIndex).trim().toLowerCase();
-        const stringCode = inputRaw.substring(firstPipeIndex + 1).trim();
+      let [theme, preset] = meta.toLowerCase().split(",");
+      theme = themes.includes(theme) ? theme : "dracula";
+      preset = presets.includes(preset) ? preset : "desktop";
 
-        if (themes.includes(stringTheme)) {
-          theme = stringTheme;
-          code = stringCode;
-        }
-      }
+      let language = detectLanguage(code);
 
-      // Rapikan JSON jika input adalah JSON
       try {
-        const parsed = JSON.parse(code);
-        code = JSON.stringify(parsed, null, 2);
-      } catch (e) {}
+        const json = JSON.parse(code);
+        code = JSON.stringify(json, null, 2);
+        language = "json";
+      } catch {}
 
-      const proses = await bot.sendMessage(msg.chat.id, `⏳ _Memproses dengan tema: ${theme.toUpperCase()}..._`, { parse_mode: "Markdown" });
+      const loading = await bot.sendMessage(
+        msg.chat.id,
+        `⏳ Generating • ${theme} • ${language} • ${preset}`,
+        { parse_mode: "Markdown" }
+      );
 
-      const imageBuffer = await generateCarbonImage(code, theme);
+      const image = await generateCarbonImage(code, theme, language, preset);
 
-      await bot.sendPhoto(msg.chat.id, imageBuffer, {
-        caption: `✅ *Berhasil!*\n*Tema:* ${theme.toUpperCase()}`,
+      await bot.sendPhoto(msg.chat.id, image, {
+        caption: `✅ *Success*\n🎨 ${theme} | 🧩 ${language} | 📐 ${preset}`,
         parse_mode: "Markdown"
       });
 
-      await bot.deleteMessage(msg.chat.id, proses.message_id);
+      await bot.deleteMessage(msg.chat.id, loading.message_id);
 
-    } catch (err) {
-      console.error(err);
-      await bot.sendMessage(msg.chat.id, "❌ Gagal memproses gambar.");
+    } catch (e) {
+      console.error(e);
+      bot.sendMessage(msg.chat.id, "❌ Error membuat gambar.");
     }
-  },
+  }
 };
-
