@@ -2,7 +2,7 @@ import axios from "axios";
 
 /**
  * Carbonara Code-to-Image for Telegram Bot
- * Fitur: Custom Theme, Auto-JSON Formatting, & Theme List
+ * Support tema dengan spasi (e.g., "One Dark", "Night Owl")
  */
 
 async function generateCarbonImage(code, selectedTheme) {
@@ -40,7 +40,7 @@ async function generateCarbonImage(code, selectedTheme) {
 export default {
   name: "carbon",
   category: "Tools",
-  description: "Ubah kode jadi gambar estetik dengan tema custom 🎨",
+  description: "Ubah kode jadi gambar dengan tema custom 🎨",
   execute: async ({ bot, msg }) => {
     const themes = [
       "3024 night", "a11y dark", "blackboard", "base16 dark", "base16 light",
@@ -51,61 +51,57 @@ export default {
       "twilight", "verminal", "vscode", "yeti", "zenburn"
     ];
 
-    const helpText = `🎨 *CARBONARA THEMES*\n\n` +
-      `Gunakan format: \`/carbon tema|kode\`\n\n` +
-      `*Daftar Tema Tersedia:* \n` + 
-      themes.map(t => `◦ ${t.charAt(0).toUpperCase() + t.slice(1)}`).join("\n") + 
-      `\n\n*Contoh:*\n\`/carbon monokai|console.log("hello world")\``;
-
     try {
-      // Mengambil teks setelah command /carbon
-      const args = msg.text?.split(" ").slice(1).join(" ");
+      // Ambil seluruh teks setelah perintah /carbon
+      const fullText = msg.text?.substring(msg.text.indexOf(" ") + 1).trim();
 
-      if (!args) {
+      // Jika tidak ada teks sama sekali atau hanya mengetik command
+      if (!fullText || msg.text === "/carbon") {
+        const helpText = `🎨 *CARBONARA THEMES*\n\n` +
+          `Gunakan format: \`/carbon tema|kode\`\n\n` +
+          `*Daftar Tema:* \n` + 
+          themes.map(t => `◦ ${t.replace(/\b\w/g, l => l.toUpperCase())}`).join("\n") + 
+          `\n\n*Contoh:*\n\`/carbon One Dark|console.log("Halo")\``;
         return await bot.sendMessage(msg.chat.id, helpText, { parse_mode: "Markdown" });
       }
 
       let theme = "dracula"; 
-      let code = args;
+      let code = fullText;
 
-      // Logika pemisahan tema dan kode
-      if (args.includes("|")) {
-        const parts = args.split("|");
-        const inputTheme = parts[0].trim().toLowerCase();
+      // KUNCI PERBAIKAN: Pisahkan berdasarkan karakter '|' saja
+      if (fullText.includes("|")) {
+        const [inputTheme, ...codeParts] = fullText.split("|");
+        const cleanTheme = inputTheme.trim().toLowerCase();
         
-        if (themes.includes(inputTheme)) {
-          theme = inputTheme;
-          code = parts.slice(1).join("|").trim();
+        if (themes.includes(cleanTheme)) {
+          theme = cleanTheme;
+          code = codeParts.join("|").trim(); // Gabungkan sisa bagian jika ada pipe di dalam kode
         } else {
-          return await bot.sendMessage(msg.chat.id, `❌ Tema *"${inputTheme}"* tidak ditemukan!\n\n${helpText}`, { parse_mode: "Markdown" });
+          return await bot.sendMessage(msg.chat.id, `❌ Tema *"${inputTheme.trim()}"* tidak valid.\nCek daftar tema dengan mengetik \`/carbon\``, { parse_mode: "Markdown" });
         }
       }
 
-      // Merapikan JSON otomatis jika input valid JSON
+      // Rapikan JSON otomatis
       try {
         const parsed = JSON.parse(code);
         code = JSON.stringify(parsed, null, 2);
-      } catch (e) {
-        // Biarkan teks original jika bukan JSON
-      }
+      } catch (e) {}
 
-      // Pesan Loading
-      const proses = await bot.sendMessage(msg.chat.id, `⏳ _Memproses gambar dengan tema ${theme}..._`, { parse_mode: "Markdown" });
+      const proses = await bot.sendMessage(msg.chat.id, `⏳ _Sedang memproses tema ${theme.toUpperCase()}..._`, { parse_mode: "Markdown" });
 
       const imageBuffer = await generateCarbonImage(code, theme);
 
-      // Kirim Foto
       await bot.sendPhoto(msg.chat.id, imageBuffer, {
-        caption: `✅ *Success!*\n*Theme:* ${theme.toUpperCase()}\n\n_Hasil visualisasi kode Anda._`,
+        caption: `✅ *Success!*\n*Theme:* ${theme.toUpperCase()}`,
         parse_mode: "Markdown"
       });
 
-      // Hapus pesan loading
       await bot.deleteMessage(msg.chat.id, proses.message_id);
 
     } catch (err) {
       console.error("[CARBON ERROR]", err);
-      await bot.sendMessage(msg.chat.id, "❌ Terjadi kesalahan saat membuat gambar. Pastikan kode Anda benar.");
+      await bot.sendMessage(msg.chat.id, "❌ Terjadi kesalahan teknis.");
     }
   },
 };
+
